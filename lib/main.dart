@@ -26,15 +26,16 @@ class _MyHomePageState extends State<MyHomePage>
   Animation<double> scaleProgress;
   AnimationController controller;
   List<Circle> circles = <Circle>[];
-  double ITEM_SIZE = 10.0;
+  double ITEM_SIZE = 30.0;
   bool updateFlag = false;
   ui.Image maskImage;
+  Offset currentPosition;
 
   final _random = new Random();
 
   void generateItems() {
-    double screenWidth = ui.window.physicalSize.width;
-    double screenHeight = ui.window.physicalSize.height;
+    double screenWidth = ui.window.physicalSize.width / 2;
+    double screenHeight = ui.window.physicalSize.height / 2;
 
     double columns = (screenWidth / ITEM_SIZE).ceilToDouble() + 1;
     double rows = (screenHeight / ITEM_SIZE).ceilToDouble() + 1;
@@ -47,7 +48,7 @@ class _MyHomePageState extends State<MyHomePage>
 
       circles.add(Circle(
           position: Offset(column * ITEM_SIZE, row * ITEM_SIZE),
-          radius: (ITEM_SIZE / 30) * _random.nextDouble(),
+          radius: 1,
           paint: paint));
     }
 
@@ -57,9 +58,10 @@ class _MyHomePageState extends State<MyHomePage>
   }
 
   Completer<ImageInfo> completer = Completer();
-  Future<ui.Image> getImage() async {
+
+  Future<void> getImage() async {
     String path =
-        'https://oyebesmartest.com/public/uploads/preview/vivo-u20-mobile-wallpaper-full-hd-original-(1)l9kwmpro8e.png';
+        'https://camo.githubusercontent.com/439826448be7909f3d90757596c7d9f2d4aacc56/68747470733a2f2f6c68362e676f6f676c6575736572636f6e74656e742e636f6d2f2d334c69462d4d426c364f452f554f3554585a37323461492f41414141414141414535302f4a574c716465454d3951592f73323536302f436f6c6f7261646f253242526976657225324253756e7365742e6a7067';
     var img = new NetworkImage(path);
     img
         .resolve(ImageConfiguration())
@@ -77,42 +79,42 @@ class _MyHomePageState extends State<MyHomePage>
   void initState() {
     super.initState();
 
-    getImage();
-
-    generateItems();
-
     controller = AnimationController(
-        vsync: this, duration: const Duration(milliseconds: 5000));
+      vsync: this,
+      duration: Duration(seconds: 1),
+    );
 
-    controller.forward();
-
-    scaleProgress = Tween(begin: 1.0, end: 50.0).animate(controller)
-      ..addListener(() {
-        setState(() {
-          _scaleProgress = scaleProgress.value;
-        });
-      })
-      ..addStatusListener((AnimationStatus status) {
-        if (status == AnimationStatus.completed) {
-          controller.reverse();
-        } else if (status == AnimationStatus.dismissed) {
-          controller.forward();
-        }
+    Tween(begin: 0.0, end: 1.0).animate(controller).addListener(() {
+      setState(() {
+        updateFlag = !updateFlag;
       });
+    });
+
+    controller.repeat();
+
+    getImage();
+    generateItems();
   }
 
   @override
   Widget build(BuildContext context) {
-    double screenWidth = ui.window.physicalSize.width;
-    double screenHeight = ui.window.physicalSize.height;
+    double screenWidth = ui.window.physicalSize.width / 2;
+    double screenHeight = ui.window.physicalSize.height / 2;
 
     return Scaffold(
-      body: CustomPaint(
-        size: Size(screenWidth, screenHeight),
-        painter: Painter1(
-            scaleProgress: _scaleProgress,
-            circles: circles,
-            maskImage: maskImage),
+      body: GestureDetector(
+        onPanUpdate: (DragUpdateDetails dragUpdateDetails) {
+//          setState(() {
+            currentPosition = dragUpdateDetails.globalPosition;
+//          });
+        },
+        child: CustomPaint(
+          size: Size(screenWidth, screenHeight),
+          painter: Painter1(
+              currentPosition: currentPosition,
+              circles: circles,
+              maskImage: maskImage),
+        ),
       ),
     );
   }
@@ -125,21 +127,22 @@ class _MyHomePageState extends State<MyHomePage>
 }
 
 class Painter1 extends CustomPainter {
-  double scaleProgress;
+  Offset currentPosition;
   List<Circle> circles;
   ui.Image maskImage;
 
-  Painter1({this.circles, this.scaleProgress, this.maskImage});
+  Painter1({this.circles, this.currentPosition, this.maskImage});
 
   @override
   void paint(Canvas canvas, Size size) {
-    // Paint bgPaint = Paint()..color = Color(0xffaecbf7);
-    // canvas.drawRect(Rect.fromLTWH(0, 0, size.width, size.height), bgPaint);
+     Paint bgPaint = Paint()..color = Color(0xffe0dad5);
+     canvas.drawRect(Rect.fromLTWH(0, 0, size.width, size.height), bgPaint);
 
     Path path = Path();
 
     for (var i = 0; i < circles.length; i++) {
-      circles[i].update(canvas, path, scaleProgress);
+      circles[i].update(currentPosition);
+      circles[i].draw(canvas, path);
     }
 
     // Paint paint = Paint()..color = Color(0xff000000);
@@ -166,10 +169,35 @@ class Circle {
   double radius;
   Paint paint;
 
-  Circle({this.position, this.radius, this.paint});
+  double _radius;
+  double growthValue = 0.0;
 
-  void update(Canvas canvas, Path path, double scale) {
-    // canvas.drawCircle(position, radius * scale, paint);
-    path.addOval(Rect.fromCircle(center: position, radius: radius * scale));
+  Circle({this.position, this.radius, this.paint}){
+    _radius = radius;
+  }
+
+  double normalize(double value, double min, double max) {
+    return (value - min) / (max - min);
+  }
+  double interpolate(double value, double min, double max) {
+    return min + (max - min) * value;
+  }
+  double map(double value, double min1, double max1, double min2, double max2) {
+    return interpolate(normalize(value, min1, max1), min2, max2);
+  }
+
+  void draw(Canvas canvas, Path path) {
+    radius += ((_radius + growthValue) - (radius)) * 0.075;
+
+    // canvas.drawCircle(position, d, paint);
+    path.addOval(Rect.fromCircle(center: position, radius: radius));
+  }
+
+  void update(Offset currentPosition) {
+    double distance = (currentPosition - position).distance;
+    double d = map(distance, radius, radius + 120, 50, 0);
+    if (d < 1) d = 0.1;
+
+    growthValue = d;
   }
 }
