@@ -65,7 +65,7 @@ class _MyHomePageState extends State<MyHomePage>
     super.initState();
 
     _ticker = createTicker((Duration duration) {
-      setState(() => updateFlag = !updateFlag);
+      if (maskImage != null) setState(() => updateFlag = !updateFlag);
     })
       ..start();
 

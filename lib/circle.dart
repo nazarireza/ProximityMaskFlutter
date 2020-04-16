@@ -6,9 +6,7 @@ class Circle {
   double _radius;
   double radius;
 
-  Circle({this.position, this.radius}) {
-    _radius = radius;
-  }
+  Circle({this.position, this.radius}) : _radius = radius;
 
   void draw(Path path, Offset currentPosition) {
     double distance = (currentPosition - position).distance;
